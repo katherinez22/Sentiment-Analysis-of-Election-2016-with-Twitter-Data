@@ -99,6 +99,8 @@ df_repub <- readData(repub_candidate)
 head(df_dems)
 ```
 
+![](/image/review_data.png)
+
 
 
 
@@ -167,6 +169,7 @@ df_repub_c <- cleanText(df_repub)
 head(df_dems_c)
 ```
 
+![](/image/clean_data.png)
 
 
 
@@ -183,6 +186,8 @@ In order to classify some text as positive or negative, the classification was d
 lexicon <- read.csv('/data/lexicon.csv')
 head(lexicon)
 ```
+
+![](/image/lexicon.png)
 
 ```{r}
 # R package for creating a text matrix
@@ -243,10 +248,21 @@ classifyNB <- function (textColumns, algorithm = "bayes", pstrong = 0.5, pweak =
 ```{r}
 # test on a few examples
 classifyNB("This meetup is amazing!!", algorithm="bayes")
+```
+
+![](/image/example1.png)
+
+```{r}
 classifyNB("I hate being stuck in traffic.", algorithm="bayes")
+```
+
+![](/image/example2.png)
+
+```{r}
 classifyNB("I went for a run.", algorithm="bayes")
 ```
 
+![](/image/example3.png)
 
 
 
