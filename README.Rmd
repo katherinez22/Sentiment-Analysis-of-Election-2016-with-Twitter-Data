@@ -1,9 +1,10 @@
----
-title: "Sentiment Analysis of Election 2016 with Twitter Data"
-output: html_document
----
+Sentiment Analysis of Election 2016 with Twitter Data
+==============================
 
-Author: Mengyue (Katherine) Zhao, Data Analyst @ GE Software.
+| **Name**  | Mengyue (Katherine) Zhao  |
+|----------:|:-------------|
+| **Title** | Data Analyst @ GE Software |
+
 
 Disclaimer: This demo is intended to show the techniques that can be used for Sentiment Analysis based on Twitter data. The outcomes are driven by the data and not intended to express support on behalf of (or in opposition to) any candidate.
 
@@ -293,11 +294,14 @@ barPlot <- function(df, candidate) {
 barPlot(df_out_dems, dems_candidate)
 ```
 
+![](/image/bar_plot_1.png)
+
 ```{r}
 # bar chart for Republican candidate
 barPlot(df_out_repub, repub_candidate)
 ```
 
+![](/image/bar_plot_2.png)
 
 ```{r}
 # plot comparison word cloud
@@ -336,9 +340,13 @@ options(warn=-1)
 wordCloud(df_out_dems, dems_candidate)
 ```
 
+![](/image/word_cloud_1.png)
+
 ```{r}
 # comparison word cloud for Republican candidate
 wordCloud(df_out_repub, repub_candidate)
 ```
+
+![](/image/word_cloud_2.png)
 
 *This is the demo I prepared for the Women in Software and Analytics Meetup on September 2nd, 2015. All R packages used in this script were obtained from The Comprehensive R Archive Network (CRAN).*
