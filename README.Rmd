@@ -1,0 +1,344 @@
+---
+title: "Sentiment Analysis of Election 2016 with Twitter Data"
+output: html_document
+---
+
+Author: Mengyue (Katherine) Zhao, Data Analyst @ GE Software.
+
+Disclaimer: This demo is intended to show the techniques that can be used for Sentiment Analysis based on Twitter data. The outcomes are driven by the data and not intended to express support on behalf of (or in opposition to) any candidate.
+
+
+
+Before we start any kind of Data Analysis, the first step is to obtain the data.  For this sentiment analysis, I obtained tweets related to declared presidential candidates through Twitter Search API.
+
+
+The candidates from both Republican and Democrats are:
+```{r}
+dems <- c("Chafee, Lincoln", "Clinton, Hillary", "O'Malley, Martin", "Sanders, Bernie", "Webb, Jim")
+repub <- c("Bush, Jeb", "Carson, Ben", "Christie, Chris", "Cruz, Ted", "Fiorina, Carly", "Gilmore, Jim", "Graham, Lindsey", "Huckabee, Mike", "Jindal, Bobby", "Kasich, John", "Pataki, George", "Paul, Rand", "Perry, Rick", "Rubio, Marco", "Santorum, Rick", "Trump, Donald", "Walker, Scott")
+```
+
+
+There is one female candidate from each party.
+```{r}
+dems_candidate <- "Clinton, Hillary"
+repub_candidate <- "Fiorina, Carly"
+```
+
+
+
+
+### Step 1: Access to Twitter Search API
+
+By navigating to [Twitter application web page](https://apps.twitter.com), I created a new application for this demo and generated Keys/Access Tokens of the API.
+![](/image/twitter_apps.png)
+
+
+[Documentation of Search API](https://dev.twitter.com/rest/public/search) addresses more details about how to build the search query.
+![](/image/search_api.png)
+
+
+
+
+### Step 2: Gather the Data 
+##### Time Range: "2015-08-01" to Today ("2015-08-13")
+##### Number of Record per Candidate: 10,000
+
+```{r, eval=FALSE}
+# R packages for Twitter Search API
+library(ROAuth)
+library(twitteR)
+
+# parameters for the connection
+consumer_key <- '***************'
+consumer_secret <- '***************'
+access_token <- '***************'
+access_secret <- '***************'
+
+# create you OAuth search credential
+searchCred <- setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret)
+
+# a function to pull data for each candidate from twitter
+gatherData <- function(candidate, count) {
+  # search tweets relate to a particular content
+  obj <- searchTwitter(searchString=candidate, n=count, lang="en", since="2015-08-01", until=str(Sys.Date()))
+  # parses the tweets
+  df <- do.call("rbind", lapply(obj, as.data.frame))
+  # write output to a csv file
+  candidate <- gsub(", ", "_", candidate)
+  fname <- paste(candidate, ".csv", sep="")
+  write.csv(df, file=fname, row.names=FALSE)
+}
+
+# pull data one example 
+gatherData(repub_candidate, 10000)
+```
+
+
+
+
+### Step 3: Review the Data 
+
+```{r}
+# a function to read in data from a csv file
+readData <- function(candidate) {
+  # csv file name
+  candidate <- gsub(", ", "_", candidate)
+  fname <- paste(candidate, ".csv", sep="")
+  df <- read.csv(fname, stringsAsFactors=FALSE)
+  return(df)
+}
+
+# read in the data from .csv file
+setwd("/data")
+df_dems <- readData(dems_candidate)
+df_repub <- readData(repub_candidate)
+
+# review the data
+head(df_dems)
+```
+
+
+
+
+### Step 4: Text Cleaning
+
+```{r}
+# R package for text mining
+library(stringr)
+library(tm)
+
+# get the tweets and creation time
+df_dems <- df_dems[1:10000, c("text", "created")]
+df_repub <- df_repub[1:10000, c("text", "created")]
+
+# a function to clean text by converting text to lower cases and removing RT, @, puncutations, numbers, links and etc.
+cleanText <- function(df) {
+  # get the text
+  tweet <- df$text
+  # remove retweet entities
+  tweet <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)", " ", tweet)
+  # remove html links
+  tweet <- gsub("http\\S+", " ", tweet)
+  # remove at people
+  tweet <- gsub("@\\S+", " ", tweet)
+  # remove hashtags
+  tweet <- gsub("#\\S+", " ", tweet)
+  # remove punctuation
+  tweet <- gsub("[[:punct:]]", " ", tweet)
+  # remove numbers
+  tweet <- gsub("[[:digit:]]", " ", tweet)
+  # define "tolower error handling" function 
+  tryTolower <- function(x)
+  {
+    # create missing value
+    y <- NA
+    # tryCatch error
+    try_error <- tryCatch(tolower(x), error=function(e) e)
+    # if not an error
+    if (!inherits(try_error, "error"))
+      y <- tolower(x)
+    # result
+    return(y)
+  }
+  # lower case using tryTolower with sapply 
+  tweet <- sapply(tweet, tryTolower)
+  # remove English stop words
+  tweet <- removeWords(tweet, stopwords("english"))
+  # remove words less than 2 characters
+  tweet <- gsub("(\\b)?\\w{1,2}(\\b)?", " ", tweet)
+  # remove unnecessary spaces
+  tweet <- gsub("[ \t]{2,}", " ", tweet)
+  tweet <- gsub("^\\s+|\\s+$", "", tweet)
+  # remove \n, \t and etc
+  tweet <- gsub("\n|\t", "", tweet)
+  # remove NAs in tweet
+  index <- !is.na(tweet)
+  tweet <- tweet[index]
+  names(tweet) <- NULL
+  df <- data.frame(cbind(text_c=tweet, text=df$text[index], created=df$created[index]))
+  return(df)
+}
+df_dems_c <- cleanText(df_dems)
+df_repub_c <- cleanText(df_repub)
+
+# review the data
+head(df_dems_c)
+```
+
+
+
+
+### Step 5: Build a Classification Model using Naive Bayes Algorithm
+
+In order to classify some text as positive or negative, the classification was done by using a Naive Bayes algorithm trained on [Janyce Wiebe’s subjectivity lexicon](http://mpqa.cs.pitt.edu)
+
+![](/image/1.png)
+![](/image/2.png)
+![](/image/3.png)
+
+
+```{r}
+lexicon <- read.csv('/data/lexicon.csv')
+head(lexicon)
+```
+
+```{r}
+# R package for creating a text matrix
+library(sentiment)
+
+# a function for the Naive Bayes model
+classifyNB <- function (textColumns, algorithm = "bayes", pstrong = 0.5, pweak = 1, 
+          prior = 1) 
+{
+  matrix <- create_matrix(textColumns)
+  lexicon <- read.csv('/data/lexicon.csv', header = FALSE)
+  counts <- list(positive = length(which(lexicon[, 3] == "positive")), 
+                 negative = length(which(lexicon[, 3] == "negative")), 
+                 total = nrow(lexicon))
+  documents <- c()
+  # determine the scores for each document
+  for (i in 1:nrow(matrix)) {
+    scores <- list(positive = 0, negative = 0)
+    doc <- matrix[i, ]
+    words <- findFreqTerms(doc, lowfreq = 1)
+    # match each word with Lexiton words to determine the scores for positive and negative
+    for (word in words) {
+      index <- pmatch(word, lexicon[, 1], nomatch = 0)
+      if (index > 0) {
+        entry <- lexicon[index, ]
+        polarity <- as.character(entry[[2]])
+        category <- as.character(entry[[3]])
+        count <- counts[[category]]
+        score <- pweak
+        if (polarity == "strongsubj") {score <- pstrong}
+        if (algorithm == "bayes") {score <- abs(log(score * prior/count))}
+        scores[[category]] <- scores[[category]] + score
+      }
+    }
+    # if no word matches the Lexicon, then the scores will based on the prior probability of positive words and negative words
+    for (key in names(scores)) {  
+      count <- counts[[key]]
+      total <- counts[["total"]]
+      score <- abs(log(count/total))
+      scores[[key]] <- scores[[key]] + score
+    }
+    
+    ratio <- abs(scores$positive/scores$negative) # ratio of positive/negative scores
+    prior_ratio <- abs(log(counts$positive/counts$total))/abs(log(counts$negative/counts$total)) # prior probability ratio
+    # determine the best fit
+    if (ratio == prior_ratio) {best_fit <- "neutral"}
+    else if (ratio > prior_ratio) {best_fit <- "positive"}
+    else if (ratio < prior_ratio) {best_fit <- "negative"}
+    documents <- rbind(documents, c(scores$positive, scores$negative, 
+                                    abs(scores$positive/scores$negative), 
+                                    abs(log(counts$positive/counts$total))/abs(log(counts$negative/counts$total)),
+                                    best_fit))
+  }
+  colnames(documents) <- c("POS", "NEG", "POS/NEG", "PRIOR RATIO", "BEST_FIT")
+  return(documents)
+}
+```
+```{r}
+# test on a few examples
+classifyNB("This meetup is amazing!!", algorithm="bayes")
+classifyNB("I hate being stuck in traffic.", algorithm="bayes")
+classifyNB("I went for a run.", algorithm="bayes")
+```
+
+
+
+
+### Step 6: Data Visualization
+
+```{r}
+# R packages for data visualization
+library(ggplot2)
+library(wordcloud)
+
+# a function to build the model and generate output dataset for visualization
+prepOut <- function(df) {
+  # build the model
+  classifier <- classifyNB(df$text_c, algorithm="bayes")
+  
+  # prepare the results for visualization
+  df_out <- data.frame(candidate= "Trump, Donald", 
+                       tweet=df$text, 
+                       tweet_c=df$text_c,
+                       polarity=classifier[,5], 
+                       creation_time=df$created, stringsAsFactors=FALSE)
+  return(df_out)
+}
+
+# output dataset for Republican candidate
+df_out_repub <- prepOut(df_repub_c)
+
+# output dataset for Democrats candidate
+df_out_dems <- prepOut(df_dems_c)
+
+# plot distribution of polarity
+barPlot <- function(df, candidate) {
+  plot <- ggplot(df, aes(x=polarity)) +
+          geom_bar(aes(y=..count.., fill=polarity)) +
+          scale_fill_brewer(palette="RdYlGn") +
+          labs(x="polarity categories", y="number of tweets", 
+               title = paste("Sentiment Analysis of", candidate, "\n(classification by polarity)")) +
+          theme(plot.title = element_text(size=12))
+  return(plot)
+}
+```
+
+```{r}
+# bar chart for Democrats candidate
+barPlot(df_out_dems, dems_candidate)
+```
+
+```{r}
+# bar chart for Republican candidate
+barPlot(df_out_repub, repub_candidate)
+```
+
+
+```{r}
+# plot comparison word cloud
+wordCloud <- function(df, candidate) {
+  
+  # separating text by polarity
+  pol <- levels(factor(df$polarity))
+  npol <- length(pol)
+  pol.docs <- rep("", npol)
+  for (i in 1:npol)
+  {
+    text <- df$tweet_c
+    text <- gsub(tolower(gsub(", ", "|", candidate)), " ", text)
+    tmp <- text[df$polarity == pol[i]]
+    pol.docs[i] <- paste(tmp, collapse=" ")
+  }
+  
+  # create corpus
+  pol.corpus <- Corpus(VectorSource(pol.docs))
+  tdm <- as.matrix(TermDocumentMatrix(pol.corpus))
+  termFrequency <- rowSums(tdm)
+  tdm_sub <- subset(tdm, termFrequency>=100)
+  colnames(tdm_sub) <- pol
+  
+  # comparison word cloud
+  comparison.cloud(tdm_sub, colors=brewer.pal(npol, "Set1"),
+                   scale = c(3,.5), random.order = FALSE, 
+                   title.size = 1.5, max.words=80)
+  title(paste("Comparison Word Cloud of", candidate), font.main=2.5)
+}
+```
+
+```{r}
+options(warn=-1)
+# comparison word cloud for Democrats candidate
+wordCloud(df_out_dems, dems_candidate)
+```
+
+```{r}
+# comparison word cloud for Republican candidate
+wordCloud(df_out_repub, repub_candidate)
+```
+
+*This is the demo I prepared for the Women in Software and Analytics Meetup on September 2nd, 2015. All R packages used in this script were obtained from The Comprehensive R Archive Network (CRAN).*
