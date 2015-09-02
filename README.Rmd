@@ -1,9 +1,9 @@
 Sentiment Analysis of Election 2016 with Twitter Data
 ==============================
 
+|----------:|:-------------|
 | **Name**  | Mengyue (Katherine) Zhao  |
 |----------:|:-------------|
-
 
 
 **Disclaimer: This demo is intended to show the techniques that can be used for Sentiment Analysis based on Twitter data. The outcomes are driven by the data and not intended to express support on behalf of (or in opposition to) any candidate.**
