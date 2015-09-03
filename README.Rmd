@@ -3,7 +3,7 @@ Sentiment Analysis of Election 2016 with Twitter Data
 
 | **Name**  | Katherine Zhao  |
 |----------:|:-------------:|
-| **Email** | mzhao12@dons.usfca.edu |
+| **Presentation** | http://prezi.com/zkt8b3avhcdp/?utm_campaign=share&utm_medium=copy |
 
 
 **Disclaimer: This demo is intended to show the techniques that can be used for Sentiment Analysis based on Twitter data. The outcomes are driven by the data and not intended to express support on behalf of (or in opposition to) any candidate.**
