@@ -2,7 +2,7 @@ Sentiment Analysis of Election 2016 with Twitter Data
 ==============================
 
 | **Name**  | Katherine Zhao  |
-|----------:|:-------------:|
+|:----------:|:-------------|
 | **Presentation** | http://prezi.com/zkt8b3avhcdp/?utm_campaign=share&utm_medium=copy |
 
 
